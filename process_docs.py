@@ -1,6 +1,8 @@
 import argparse
 from datetime import datetime
+import gc
 import os
+import time
 import shutil
 from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -8,8 +10,6 @@ from langchain.schema import Document
 from langchain_community.vectorstores import Chroma
 from langchain_ollama import OllamaEmbeddings
 from typing import List
-import time
-import psutil
 
 CHROMA_PATH = "chroma"
 DATA_PATH = "data"
@@ -153,49 +153,8 @@ def add_to_memory_chroma(text: str, metadata: dict = None):
 
 
 def clear_memory():
-    """Clear the memory database by safely closing connections and removing files"""
     if os.path.exists(MEM_PATH):
-        try:
-            embedding_function = get_embedding_function()
-            mem_db = Chroma(
-                persist_directory=MEM_PATH,
-                embedding_function=embedding_function
-            )
-
-            collection_name = mem_db._collection.name
-            mem_db._client.delete_collection(collection_name)
-            
-            mem_db = None
-            time.sleep(2)  
-            max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    shutil.rmtree(MEM_PATH, ignore_errors=True)
-                    if not os.path.exists(MEM_PATH):
-                        print("🧹 Memory cleared successfully")
-                        return
-                except Exception:
-                    if attempt < max_retries - 1:
-                        time.sleep(2)  # Wait between attempts
-                        continue
-            
-            # If normal deletion fails, try force cleanup
-            print("⚠️ Normal cleanup failed, attempting force cleanup...")
-            for proc in psutil.process_iter(['pid', 'name', 'open_files']):
-                try:
-                    for file in proc.open_files():
-                        if MEM_PATH in str(file.path):
-                            proc.kill()
-                            time.sleep(1)
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired):
-                    continue
-            
-            shutil.rmtree(MEM_PATH, ignore_errors=True)
-            print("🧹 Memory forcefully cleared")
-            
-        except Exception as e:
-            print(f"❌ Error clearing memory: {str(e)}")
-            print("Please restart the application and try again.")
+        shutil.rmtree(MEM_PATH)
 
 def main():
     parser = argparse.ArgumentParser()
